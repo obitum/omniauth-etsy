@@ -31,8 +31,20 @@ module OmniAuth
           options.request_params.merge!(:scope => options.scope.gsub(',', ' '))
         end
         prep_sandbox
-        super
+
+        request_token = consumer.get_request_token({:oauth_callback => callback_url}, options.request_params)
+        session['oauth'] ||= {}
+        session['oauth'][name.to_s] = {'callback_confirmed' => request_token.callback_confirmed?, 'request_token' => request_token.token, 'request_secret' => request_token.secret}
+
+        # Etsy is too slow when you don't provide the oauth_consumer_key
+        redirect request_token.params[:login_url]
+
+      rescue ::Timeout::Error => e
+        fail!(:timeout, e)
+      rescue ::Net::HTTPFatalError, ::OpenSSL::SSL::SSLError => e
+        fail!(:service_unavailable, e)
       end
+
 
       def callback_phase
         prep_sandbox
